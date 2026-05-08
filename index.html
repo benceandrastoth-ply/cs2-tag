@@ -1,976 +1,1131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="mobile-web-app-capable" content="yes"/>
-  <meta name="theme-color" content="#070707"/>
-  <title>CS2 · Bomb Defusal</title>
-
-  <!--  Orbitron — CS2 tactical font, free on Google Fonts  -->
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
-
-  <!--  Firebase Compat SDK (no build step required)  -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#060606"/>
+<title>CS2 · BOMB DEFUSAL</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
 <style>
-/* ══════════════════════════════════════════════════════════════
-   RESET & TOKENS
-══════════════════════════════════════════════════════════════ */
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#070707; --surf:#0f0f0f; --elev:#181818;
-  --bdr:#252525; --bdr2:#363636;
-  --ora:#FF6A00; --ora2:#FF9040;
-  --red:#FF1E1E; --red2:#FF5555;
-  --grn:#00E676; --grn-dim:rgba(0,230,118,.13);
-  --yel:#FFD600;
-  --wht:#EEEEEE; --wht2:#999999;
-  --gry:#444;    --gry2:#686868;
-  --F:'Orbitron',monospace;
-  --r:2px;
+@font-face {
+  font-family:'Atwater';
+  src:url('Atwater.ttf') format('truetype');
+  font-display:swap;
 }
+:root{
+  --F:'Atwater','Orbitron',monospace;
+  --bg:#060606;--surf:#0e0e0e;--raise:#151515;--card:#101010;
+  --b1:#222;--b2:#333;--b3:#444;
+  --ora:#FF6600;--ora2:#FF8C00;--ora-g:rgba(255,102,0,.13);
+  --red:#FF1A1A;--red-g:rgba(255,26,26,.13);
+  --grn:#00E676;--grn-g:rgba(0,230,118,.11);
+  --yel:#FFD600;
+  --txt:#F0F0F0;--txt2:#999;--txt3:#444;
+  --r:3px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{
   width:100%;height:100%;
-  background:var(--bg);color:var(--wht);
+  background:var(--bg);color:var(--txt);
   font-family:var(--F);
   overflow:hidden;
   -webkit-tap-highlight-color:transparent;
-  -webkit-text-size-adjust:100%;
 }
-
-/* ══════════════════════════════════════════════════════════════
-   SCREENS
-══════════════════════════════════════════════════════════════ */
-.scr{
-  position:fixed;inset:0;
-  display:none;flex-direction:column;align-items:center;
-  overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:max(env(safe-area-inset-top),20px) 22px max(env(safe-area-inset-bottom),20px);
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9998;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 4px);
 }
+/* screens */
+.scr{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:max(env(safe-area-inset-top),28px) 20px max(env(safe-area-inset-bottom),24px);}
 .scr.on{display:flex}
-
-/* ══════════════════════════════════════════════════════════════
-   LOADING OVERLAY
-══════════════════════════════════════════════════════════════ */
-#load{
-  position:fixed;inset:0;z-index:999;
-  background:var(--bg);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
-}
-#load.off{display:none}
-.spin{
-  width:38px;height:38px;
-  border:3px solid var(--bdr2);border-top-color:var(--ora);
-  border-radius:50%;animation:spin .75s linear infinite;
-}
-.load-txt{font-size:11px;letter-spacing:6px;color:var(--ora)}
+/* loader */
+#loader{position:fixed;inset:0;z-index:9000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .35s;}
+#loader.hide{opacity:0;pointer-events:none}
+.ld-spin{width:40px;height:40px;border:2px solid var(--b3);border-top-color:var(--ora);border-radius:50%;animation:spin .7s linear infinite}
+.ld-txt{font-size:10px;letter-spacing:7px;color:var(--ora)}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-/* ══════════════════════════════════════════════════════════════
-   SHARED COMPONENTS
-══════════════════════════════════════════════════════════════ */
-
-/* — Inputs — */
-.inp{
-  width:100%;background:var(--elev);
-  border:1px solid var(--bdr2);border-radius:var(--r);
-  color:var(--wht);font-family:var(--F);
-  font-size:17px;letter-spacing:3px;
-  padding:13px 15px;outline:none;
-  transition:border-color .2s;
-}
-.inp:focus{border-color:var(--ora)}
-.inp-code{font-size:34px;letter-spacing:14px;text-align:center}
-.field{width:100%;margin-bottom:13px}
-.lbl{display:block;font-size:9px;letter-spacing:6px;color:var(--gry2);margin-bottom:6px}
-
-/* — Buttons — */
-.btn{
-  width:100%;border:none;border-radius:var(--r);
-  font-family:var(--F);font-size:13px;letter-spacing:5px;
-  padding:16px 12px;margin-bottom:10px;cursor:pointer;
-  transition:opacity .15s,transform .1s;
-  user-select:none;-webkit-user-select:none;
-}
-.btn:active{opacity:.8;transform:scale(.98)}
-.btn-ora{background:var(--ora);color:#050505;font-weight:900}
-.btn-ghost{background:transparent;border:1px solid var(--bdr2);color:var(--wht2)}
+/* card */
+.card{width:100%;background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:16px;margin-bottom:10px}
+.card-ttl{font-size:9px;letter-spacing:6px;color:var(--ora);margin-bottom:12px}
+/* input */
+.inp{width:100%;background:var(--raise);border:1px solid var(--b2);border-radius:var(--r);color:var(--txt);font-family:var(--F);font-size:16px;letter-spacing:3px;padding:14px 15px;outline:none;-webkit-appearance:none;transition:border-color .2s,box-shadow .2s}
+.inp:focus{border-color:var(--ora);box-shadow:0 0 0 3px var(--ora-g)}
+.inp-code{font-size:40px;letter-spacing:16px;text-align:center;padding:12px 8px}
+.inp[type=number]::-webkit-inner-spin-button,.inp[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+.inp[type=number]{-moz-appearance:textfield}
+.fld{width:100%;margin-bottom:12px}
+.lbl{display:block;font-size:9px;letter-spacing:6px;color:var(--txt3);margin-bottom:6px}
+/* buttons */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;border-radius:var(--r);font-family:var(--F);font-size:12px;letter-spacing:5px;padding:17px 12px;margin-bottom:10px;cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .1s,opacity .15s;position:relative;overflow:hidden}
+.btn::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.07),transparent 55%);pointer-events:none}
+.btn:active{transform:scale(.97);opacity:.85}
+.btn-ora{background:linear-gradient(135deg,var(--ora),var(--ora2));color:#040404;font-weight:900;box-shadow:0 4px 20px rgba(255,102,0,.28)}
+.btn-ghost{background:transparent;border:1px solid var(--b2);color:var(--txt2)}
 .btn-red{background:transparent;border:1px solid var(--red);color:var(--red)}
-.btn[disabled],.btn.dis{opacity:.3;pointer-events:none}
-
-/* — Divider row — */
-.divrow{display:flex;align-items:center;gap:10px;width:100%;margin-bottom:12px}
-.divline{flex:1;height:1px;background:var(--bdr)}
-
-/* — Card — */
-.card{
-  width:100%;background:var(--surf);
-  border:1px solid var(--bdr);border-radius:var(--r);
-  padding:16px;margin-bottom:12px;
-}
-.card-ttl{font-size:9px;letter-spacing:6px;color:var(--ora);margin-bottom:10px}
-
-/* ══════════════════════════════════════════════════════════════
-   HOME SCREEN
-══════════════════════════════════════════════════════════════ */
-#s-home{gap:0;padding-top:36px}
-
-.logo{
-  width:100%;background:var(--surf);
-  border:1px solid var(--bdr);border-radius:var(--r);
-  padding:26px 20px;text-align:center;margin-bottom:26px;
-  animation:logoglow 3s ease-in-out infinite;
-}
-@keyframes logoglow{
-  0%,100%{border-color:var(--bdr);box-shadow:none}
-  50%{border-color:var(--ora);box-shadow:0 0 24px rgba(255,106,0,.18)}
-}
-.logo-eye{font-size:9px;letter-spacing:9px;color:var(--ora)}
-.logo-main{font-size:52px;font-weight:900;letter-spacing:5px;line-height:.9;margin:10px 0}
-.logo-sub{font-size:9px;letter-spacing:5px;color:var(--gry2)}
-
-/* ══════════════════════════════════════════════════════════════
-   LOBBY SCREEN
-══════════════════════════════════════════════════════════════ */
-#s-lobby{padding-top:16px;gap:0}
-
-.code-card{
-  width:100%;background:var(--surf);
-  border:1px solid var(--ora);border-radius:var(--r);
-  padding:18px;text-align:center;margin-bottom:12px;
-  animation:logoglow 2.5s ease-in-out infinite;
-}
+.btn-sm{width:auto;padding:8px 14px;font-size:9px;letter-spacing:4px;margin-bottom:0}
+.btn-off{opacity:.28 !important;pointer-events:none !important}
+/* divider */
+.drow{display:flex;align-items:center;gap:10px;width:100%;margin-bottom:12px}
+.dline{flex:1;height:1px;background:var(--b1)}
+.dtxt{font-size:9px;letter-spacing:5px;color:var(--txt3)}
+/* waiting dots */
+.dots{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 0;margin-bottom:10px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ora);animation:pdot 1.1s ease-in-out infinite}
+.dot:nth-child(2){animation-delay:.18s}
+.dot:nth-child(3){animation-delay:.36s}
+@keyframes pdot{0%,100%{opacity:.2;transform:scale(.75)}50%{opacity:1;transform:scale(1)}}
+.dots-lbl{font-size:11px;letter-spacing:4px;color:var(--txt3)}
+/* ── HOME ── */
+#s-home{padding-top:48px}
+.logo{width:100%;background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:28px 20px 24px;text-align:center;margin-bottom:28px;position:relative;animation:lglow 3.5s ease-in-out infinite}
+@keyframes lglow{0%,100%{border-color:var(--b1);box-shadow:none}50%{border-color:var(--ora);box-shadow:0 0 28px var(--ora-g),inset 0 0 16px var(--ora-g)}}
+.logo::before,.logo::after{content:'';position:absolute;width:13px;height:13px;border-color:var(--ora);border-style:solid}
+.logo::before{top:8px;left:8px;border-width:2px 0 0 2px}
+.logo::after{bottom:8px;right:8px;border-width:0 2px 2px 0}
+.logo-eye{font-size:9px;letter-spacing:8px;color:var(--ora);margin-bottom:10px}
+.logo-ttl{font-size:54px;font-weight:900;letter-spacing:4px;line-height:.85;text-shadow:0 0 40px rgba(255,102,0,.18)}
+.logo-sub{font-size:9px;letter-spacing:5px;color:var(--txt3);margin-top:14px}
+/* ── LOBBY ── */
+#s-lobby{padding-top:18px}
+.code-card{width:100%;background:var(--card);border:1px solid var(--ora);border-radius:var(--r);padding:18px;text-align:center;margin-bottom:12px;animation:lglow 3s ease-in-out infinite}
 .code-lbl{font-size:9px;letter-spacing:8px;color:var(--ora);margin-bottom:2px}
-.code-val{font-size:66px;font-weight:900;letter-spacing:14px;line-height:1.15}
-.code-hint{font-size:9px;letter-spacing:3px;color:var(--gry2);margin-top:2px}
-
-.p-row{
-  display:flex;align-items:center;gap:9px;
-  padding:9px 0;border-bottom:1px solid var(--bdr);
-}
-.p-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.p-name{flex:1;font-size:14px;letter-spacing:2px}
-.tag{
-  font-size:8px;letter-spacing:2px;border:1px solid currentColor;
-  padding:2px 5px;border-radius:1px;
-}
-.no-more{font-size:9px;letter-spacing:3px;color:var(--gry2);text-align:center;padding:10px 0}
-
-.wait-row{
-  display:flex;align-items:center;justify-content:center;
-  gap:10px;padding:15px 0;margin-bottom:10px;
-}
-.wd{width:7px;height:7px;border-radius:50%;background:var(--ora);
-    animation:wd 1s ease-in-out infinite}
-.wd:nth-child(2){animation-delay:.2s}
-.wd:nth-child(3){animation-delay:.4s}
-@keyframes wd{0%,100%{opacity:.25}50%{opacity:1}}
-.wait-txt{font-size:11px;letter-spacing:4px;color:var(--gry2)}
-
-/* ══════════════════════════════════════════════════════════════
-   SHARED GAME STYLES
-══════════════════════════════════════════════════════════════ */
-.game-scr{justify-content:center}
-
-.phase-tag{font-size:13px;letter-spacing:7px;text-align:center;margin-bottom:5px}
-.phase-note{
-  font-size:11px;letter-spacing:2px;color:var(--gry2);
-  text-align:center;line-height:1.9;margin-bottom:22px;
-}
-
-/* Progress bar */
-.bar-track{
-  width:100%;height:6px;background:var(--elev);
-  border-radius:3px;overflow:hidden;margin-bottom:5px;
-}
-.bar-fill{height:100%;border-radius:3px;width:0%;transition:width .14s}
-.bar-lbl{
-  font-size:9px;letter-spacing:3px;color:var(--gry2);
-  margin-bottom:18px;align-self:flex-start;min-height:13px;
-}
-
-/* ── Ring Button ────────────────────────────────────────────── */
-.ring-wrap{
-  position:relative;width:210px;height:210px;
-  margin:6px auto 0;
-  user-select:none;-webkit-user-select:none;
-  touch-action:none;cursor:pointer;flex-shrink:0;
-}
+.code-val{font-size:68px;font-weight:900;letter-spacing:14px;line-height:1.15}
+.code-hint{font-size:9px;letter-spacing:3px;color:var(--txt3);margin-top:2px}
+.prow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--b1)}
+.prow:last-child{border-bottom:none}
+.pdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.pname{flex:1;font-size:14px;letter-spacing:2px}
+.ptags{display:flex;gap:4px}
+.ptag{font-size:8px;letter-spacing:2px;border:1px solid currentColor;padding:2px 6px;border-radius:1px}
+.pempty{font-size:10px;letter-spacing:3px;color:var(--txt3);text-align:center;padding:10px 0}
+/* ── GAME ── */
+#s-game{padding-top:16px}
+.role-bar{width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:var(--r);border:1px solid;margin-bottom:12px}
+.role-bar.planter{background:var(--red-g);border-color:var(--red)}
+.role-bar.seeker{background:var(--grn-g);border-color:var(--grn)}
+.role-desc{font-size:9px;letter-spacing:4px;color:var(--txt2)}
+.role-name{font-size:17px;font-weight:900;letter-spacing:4px}
+.role-bar.planter .role-name{color:var(--red)}
+.role-bar.seeker .role-name{color:var(--grn)}
+.host-strip{width:100%;display:flex;justify-content:flex-end;margin-bottom:8px}
+.status-card{width:100%;background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:14px 16px;text-align:center;margin-bottom:12px}
+.status-txt{font-size:11px;letter-spacing:3px;color:var(--txt2);line-height:2}
+.cdown{width:100%;background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:16px;text-align:center;margin-bottom:12px;display:none}
+.cdown-tag{font-size:9px;letter-spacing:7px;color:var(--red);margin-bottom:4px}
+.cdown-val{font-size:80px;font-weight:900;letter-spacing:4px;line-height:1;transition:color .4s,text-shadow .4s;text-shadow:0 0 28px currentColor}
+.cdown-crit{font-size:11px;letter-spacing:4px;color:var(--red);margin-top:6px;display:none;animation:blink .4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+.prog-wrap{width:100%;display:none}
+.prog-track{width:100%;height:5px;background:var(--raise);border-radius:3px;overflow:hidden;margin-bottom:5px}
+.prog-fill{height:100%;border-radius:3px;width:0%;transition:width .1s,background .3s}
+.prog-lbl{font-size:9px;letter-spacing:3px;color:var(--txt3);margin-bottom:12px;min-height:12px}
+.ring-area{width:100%;display:none;flex-direction:column;align-items:center;margin-bottom:10px}
+.ring-wrap{position:relative;width:210px;height:210px;user-select:none;-webkit-user-select:none;touch-action:none;cursor:pointer}
 .ring-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}
-.rb{fill:none;stroke:var(--elev);stroke-width:9}
-.rfa{
-  fill:none;stroke:var(--ora);stroke-width:9;stroke-linecap:round;
-  stroke-dasharray:565.49;stroke-dashoffset:565.49;
-  transition:stroke-dashoffset .12s,stroke .2s;
-}
-.rfg{
-  fill:none;stroke:var(--grn);stroke-width:9;stroke-linecap:round;
-  stroke-dasharray:565.49;stroke-dashoffset:565.49;
-  transition:stroke-dashoffset .12s;
-}
-.ring-in{
-  position:absolute;inset:13px;background:var(--elev);border-radius:50%;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
-  border:2px solid transparent;transition:border-color .2s,background .2s;
-}
-.ring-in.hold-ora{border-color:var(--ora);background:#180500}
-.ring-in.hold-grn{border-color:var(--grn);background:var(--grn-dim)}
-.ring-icon{font-size:42px;line-height:1;pointer-events:none}
-.ring-lbl{
-  font-size:11px;letter-spacing:3px;text-align:center;
-  line-height:1.6;pointer-events:none;
-}
-
-.footnote{font-size:9px;letter-spacing:3px;color:var(--gry);text-align:center;margin-top:13px}
-.pulse-btn{animation:pulse 1.3s ease-in-out infinite}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-
-/* ══════════════════════════════════════════════════════════════
-   PLANTED / COUNTDOWN SCREEN
-══════════════════════════════════════════════════════════════ */
-.planted-tag{font-size:15px;letter-spacing:7px;color:var(--red);text-align:center;margin-bottom:4px}
-.countdown{
-  font-size:84px;font-weight:900;letter-spacing:5px;
-  text-align:center;line-height:1;
-  margin:4px 0 6px;
-  text-shadow:0 0 32px currentColor;
-  transition:color .4s,text-shadow .4s;
-}
-.crit-warn{
-  font-size:11px;letter-spacing:4px;color:var(--red);
-  text-align:center;margin-bottom:10px;
-  animation:blink .45s ease-in-out infinite;
-}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-
-/* ══════════════════════════════════════════════════════════════
-   RESULT SCREEN
-══════════════════════════════════════════════════════════════ */
+.r-bg{fill:none;stroke:var(--raise);stroke-width:10}
+.r-arc{fill:none;stroke-width:10;stroke-linecap:round;stroke-dasharray:534.07;stroke-dashoffset:534.07;transition:stroke-dashoffset .1s,stroke .2s}
+.ring-face{position:absolute;inset:14px;background:var(--raise);border-radius:50%;border:2px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:border-color .2s,background .2s,box-shadow .2s}
+.ring-face.act-o{border-color:var(--ora);background:#180500;box-shadow:0 0 32px rgba(255,102,0,.32)}
+.ring-face.act-g{border-color:var(--grn);background:var(--grn-g);box-shadow:0 0 32px rgba(0,230,118,.30)}
+.ring-icon{font-size:44px;pointer-events:none;line-height:1}
+.ring-lbl{font-size:12px;letter-spacing:3px;text-align:center;line-height:1.7;pointer-events:none}
+.ring-pct{font-size:24px;font-weight:900;letter-spacing:2px;pointer-events:none;display:none}
+.ring-idle{animation:ridle 1.6s ease-in-out infinite}
+@keyframes ridle{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+.seeker-view{width:100%;display:none;flex-direction:column;align-items:center;gap:14px;padding:16px 0}
+.seeker-ico{font-size:72px;animation:sico 1s ease-in-out infinite}
+@keyframes sico{0%,100%{transform:scale(1)}50%{transform:scale(1.10)}}
+.seeker-lbl{font-size:12px;letter-spacing:4px;color:var(--txt2);text-align:center;line-height:1.8}
+.game-foot{font-size:9px;letter-spacing:3px;color:var(--txt3);text-align:center;margin-top:6px;padding-bottom:8px}
+/* ── RESULT ── */
 #s-result{justify-content:center}
-
-.res-card{
-  width:100%;background:var(--surf);border-radius:var(--r);
-  padding:30px 20px;text-align:center;margin-bottom:22px;
-  animation:resin .38s cubic-bezier(.34,1.56,.64,1) both;
-}
-@keyframes resin{from{opacity:0;transform:scale(.82)}to{opacity:1;transform:scale(1)}}
-.res-icon{font-size:68px;margin-bottom:14px}
-.res-hl{font-size:28px;font-weight:900;letter-spacing:4px;margin-bottom:3px}
-.res-sub{font-size:11px;letter-spacing:5px;margin-bottom:18px}
-.res-rule{width:48%;height:1px;margin:0 auto 18px}
-.res-body{font-size:11px;letter-spacing:2px;color:var(--wht2);line-height:1.9}
+.res-card{width:100%;background:var(--card);border-width:2px;border-style:solid;border-radius:var(--r);padding:32px 20px;text-align:center;margin-bottom:22px;animation:popin .4s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes popin{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+.res-ico{font-size:74px;margin-bottom:14px}
+.res-hl{font-size:28px;font-weight:900;letter-spacing:4px;margin-bottom:4px}
+.res-sub{font-size:11px;letter-spacing:5px;margin-bottom:20px}
+.res-rule{width:44%;height:1px;margin:0 auto 20px}
+.res-body{font-size:11px;letter-spacing:2px;color:var(--txt2);line-height:2.1}
+/* ── TOAST ── */
+#toast{position:fixed;bottom:max(env(safe-area-inset-bottom),18px);left:50%;transform:translateX(-50%) translateY(60px);background:var(--raise);border:1px solid var(--b2);border-radius:var(--r);padding:10px 20px;font-size:11px;letter-spacing:3px;color:var(--txt);white-space:nowrap;z-index:8000;opacity:0;transition:transform .28s,opacity .28s;pointer-events:none}
+#toast.on{transform:translateX(-50%) translateY(0);opacity:1}
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════════
-     LOADING
-═══════════════════════════════════════════════════════════ -->
-<div id="load">
-  <div class="spin"></div>
-  <span class="load-txt">INITIALIZING</span>
+<!-- LOADER -->
+<div id="loader">
+  <div class="ld-spin"></div>
+  <div class="ld-txt" id="ld-msg">LOADING</div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     HOME SCREEN
-═══════════════════════════════════════════════════════════ -->
+<!-- ══ HOME ═══════════════════════════════ -->
 <div class="scr" id="s-home">
-
   <div class="logo">
-    <div class="divrow" style="margin-bottom:10px">
-      <div class="divline"></div>
-      <span class="logo-eye">COUNTER-STRIKE 2</span>
-      <div class="divline"></div>
+    <div class="drow" style="margin-bottom:10px">
+      <div class="dline"></div><span class="dtxt">COUNTER&#8209;STRIKE 2</span><div class="dline"></div>
     </div>
-    <div class="logo-main">BOMB<br>DEFUSAL</div>
+    <div class="logo-ttl">BOMB<br>DEFUSAL</div>
     <div class="logo-sub">TACTICAL MULTIPLAYER · FIREBASE SYNC</div>
   </div>
-
-  <div class="field">
-    <label class="lbl">CALLSIGN</label>
-    <input class="inp" id="h-name" type="text" placeholder="ENTER NAME"
-           maxlength="12" autocomplete="off" spellcheck="false"
+  <div class="fld">
+    <label class="lbl" for="n-name">CALLSIGN</label>
+    <input class="inp" id="n-name" type="text" placeholder="ENTER NAME"
+           maxlength="14" autocomplete="off" spellcheck="false"
            oninput="this.value=this.value.toUpperCase()"/>
   </div>
-
-  <div id="h-menu" style="width:100%">
-    <button class="btn btn-ora" onclick="homeCreate()">⬡  CREATE ROOM</button>
-    <button class="btn btn-ghost" onclick="showJoin()">⬡  JOIN ROOM</button>
+  <div id="v-menu" style="width:100%">
+    <button class="btn btn-ora" onclick="uiCreate()">⬡&nbsp;&nbsp;CREATE ROOM</button>
+    <button class="btn btn-ghost" onclick="uiShowJoin()">⬡&nbsp;&nbsp;JOIN ROOM</button>
   </div>
-
-  <div id="h-join" style="width:100%;display:none">
-    <div class="field">
-      <label class="lbl">ROOM CODE</label>
-      <input class="inp inp-code" id="h-code" type="number"
-             placeholder="0000" maxlength="4" inputmode="numeric"/>
+  <div id="v-join" style="width:100%;display:none">
+    <div class="fld">
+      <label class="lbl" for="n-code">ROOM CODE</label>
+      <input class="inp inp-code" id="n-code" type="number"
+             placeholder="0000" inputmode="numeric" maxlength="4"/>
     </div>
-    <button class="btn btn-ora" onclick="homeJoin()">⬡  ENTER ROOM</button>
-    <button class="btn btn-ghost" onclick="showMenu()">◀  BACK</button>
+    <button class="btn btn-ora" onclick="uiJoin()">⬡&nbsp;&nbsp;ENTER ROOM</button>
+    <button class="btn btn-ghost" onclick="uiShowMenu()">◀&nbsp;&nbsp;BACK</button>
   </div>
-
-  <span style="font-size:9px;letter-spacing:4px;color:var(--gry);margin-top:36px">
-    v1.0 · REALTIME DATABASE
-  </span>
+  <div style="font-size:9px;letter-spacing:4px;color:var(--txt3);margin-top:40px">
+    v2.1 · REALTIME DATABASE
+  </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     LOBBY SCREEN
-═══════════════════════════════════════════════════════════ -->
+<!-- ══ LOBBY ══════════════════════════════ -->
 <div class="scr" id="s-lobby">
-
   <div class="code-card">
     <div class="code-lbl">ROOM CODE</div>
     <div class="code-val" id="l-code">0000</div>
     <div class="code-hint">Share with teammates</div>
   </div>
-
-  <div class="card" style="flex:1;min-height:100px">
-    <div class="card-ttl">OPERATORS [<span id="l-cnt">0</span>]</div>
+  <div class="card" style="flex:1;min-height:80px">
+    <div class="card-ttl">OPERATORS [<span id="l-cnt">0</span>/8]</div>
     <div id="l-players"></div>
-    <div id="l-need-more" class="no-more">Need at least 1 more player…</div>
+    <div id="l-empty" class="pempty">Waiting for more players…</div>
   </div>
-
-  <div class="card" style="background:var(--elev)">
-    <div style="font-size:10px;letter-spacing:1px;color:var(--wht2);line-height:2.1">
-      🔴 ONE player holds 💣 60s to arm &amp; hide the phone<br>
-      🔵 Others search &amp; hold 🔧 5s to defuse<br>
-      ⚡ 75 seconds before detonation
+  <div class="card" style="background:var(--raise)">
+    <div style="font-size:10px;letter-spacing:1px;color:var(--txt2);line-height:2.1">
+      🔴 &nbsp;One random player is chosen as <b style="color:var(--red)">PLANTER</b><br>
+      📱 &nbsp;Planter holds 60s to arm, then hides the phone<br>
+      🔵 &nbsp;<b style="color:var(--grn)">SEEKERS</b> have 75s to find &amp; hold 5s to defuse<br>
+      📍 &nbsp;Only the planted phone shows the Defuse button
     </div>
   </div>
-
   <div id="l-host-row" style="width:100%;display:none">
-    <button class="btn btn-ora dis" id="l-start" onclick="startGame()">
-      ▶  START MISSION
+    <button class="btn btn-ora btn-off" id="btn-start" onclick="doStartGame()">
+      ▶&nbsp;&nbsp;START MISSION
     </button>
   </div>
-  <div id="l-guest-row" class="wait-row" style="display:none">
-    <div class="wd"></div><div class="wd"></div><div class="wd"></div>
-    <span class="wait-txt">WAITING FOR HOST</span>
+  <div id="l-guest-row" class="dots" style="display:none">
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    <span class="dots-lbl">WAITING FOR HOST</span>
   </div>
-
-  <button class="btn btn-red" onclick="leaveRoom()" style="margin-top:4px">
-    ✕  LEAVE ROOM
+  <button class="btn btn-red" onclick="doLeave()" style="margin-top:4px">
+    ✕&nbsp;&nbsp;LEAVE ROOM
   </button>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     PLANTING SCREEN
-═══════════════════════════════════════════════════════════ -->
-<div class="scr game-scr" id="s-planting">
-
-  <div class="phase-tag" style="color:var(--ora)">⚠  PLANTING PHASE</div>
-  <div class="phase-note">
-    The BOMBER arms the device &amp; hides the phone.<br>
-    All others wait for the 75s hunt to begin.
+<!-- ══ GAME ════════════════════════════════ -->
+<div class="scr" id="s-game">
+  <div class="role-bar planter" id="g-role">
+    <span class="role-desc"  id="g-role-desc">ROLE</span>
+    <span class="role-name"  id="g-role-name">PLANTER</span>
   </div>
-
-  <div class="bar-track" style="width:100%">
-    <div class="bar-fill" id="pb-fill" style="background:var(--ora)"></div>
+  <div class="host-strip" id="g-host-strip" style="display:none">
+    <button class="btn btn-ghost btn-sm" onclick="doReset()">↺&nbsp;&nbsp;RESET GAME</button>
   </div>
-  <div class="bar-lbl" id="pb-lbl">HOLD TO ARM  ·  RELEASE = ABORT</div>
-
-  <div class="ring-wrap pulse-btn" id="plant-btn">
-    <svg viewBox="0 0 200 200">
-      <circle class="rb"  cx="100" cy="100" r="90"/>
-      <circle class="rfa" cx="100" cy="100" r="90" id="pr"/>
-    </svg>
-    <div class="ring-in" id="plant-in">
-      <span class="ring-icon">💣</span>
-      <span class="ring-lbl" id="plant-lbl">HOLD 60S<br>TO PLANT</span>
+  <div class="status-card">
+    <div class="status-txt" id="g-status">—</div>
+  </div>
+  <div class="cdown" id="g-cdown">
+    <div class="cdown-tag">☢&nbsp; BOMB PLANTED</div>
+    <div class="cdown-val" id="g-cdown-val" style="color:var(--ora)">01:15</div>
+    <div class="cdown-crit" id="g-cdown-crit">⚠ CRITICAL — DEFUSE NOW ⚠</div>
+  </div>
+  <div class="prog-wrap" id="g-prog">
+    <div class="prog-track"><div class="prog-fill" id="g-prog-fill"></div></div>
+    <div class="prog-lbl" id="g-prog-lbl"></div>
+  </div>
+  <div class="ring-area" id="g-ring">
+    <div class="ring-wrap ring-idle" id="ring-btn">
+      <svg viewBox="0 0 190 190">
+        <circle class="r-bg"  cx="95" cy="95" r="85"/>
+        <circle class="r-arc" cx="95" cy="95" r="85" id="ring-arc" style="stroke:var(--ora)"/>
+      </svg>
+      <div class="ring-face" id="ring-face">
+        <div class="ring-icon" id="ring-icon">💣</div>
+        <div class="ring-lbl"  id="ring-lbl">HOLD 60S<br>TO PLANT</div>
+        <div class="ring-pct"  id="ring-pct"></div>
+      </div>
     </div>
   </div>
-
-  <div id="plant-roster" style="font-size:9px;letter-spacing:3px;color:var(--gry2);text-align:center;margin-top:10px"></div>
-  <div class="footnote">Only the bomber should hold this button</div>
+  <div class="seeker-view" id="g-seeker">
+    <div class="seeker-ico" id="g-seeker-ico">⏳</div>
+    <div class="seeker-lbl" id="g-seeker-lbl">STANDBY</div>
+  </div>
+  <div class="game-foot" id="g-foot"></div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     PLANTED / COUNTDOWN + DEFUSE SCREEN
-═══════════════════════════════════════════════════════════ -->
-<div class="scr game-scr" id="s-planted">
-
-  <div class="planted-tag">☢  BOMB PLANTED</div>
-  <div class="countdown" id="countdown" style="color:var(--ora)">01:15</div>
-  <div class="crit-warn" id="crit" style="display:none">
-    ⚠  CRITICAL — DEFUSE IMMEDIATELY  ⚠
-  </div>
-
-  <div class="bar-track" style="width:100%">
-    <div class="bar-fill" id="db-fill" style="background:var(--grn)"></div>
-  </div>
-  <div class="bar-lbl" id="db-lbl">HOLD 5S TO DEFUSE  ·  RELEASE = ABORT</div>
-
-  <div class="ring-wrap" id="def-btn">
-    <svg viewBox="0 0 200 200">
-      <circle class="rb"  cx="100" cy="100" r="90"/>
-      <circle class="rfg" cx="100" cy="100" r="90" id="dr"/>
-    </svg>
-    <div class="ring-in" id="def-in">
-      <span class="ring-icon">🔧</span>
-      <span class="ring-lbl" id="def-lbl">HOLD TO<br>DEFUSE</span>
-    </div>
-  </div>
-
-  <div class="footnote">Find the phone · Hold 5s · Don't let go!</div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════
-     RESULT SCREEN
-═══════════════════════════════════════════════════════════ -->
+<!-- ══ RESULT ══════════════════════════════ -->
 <div class="scr" id="s-result">
-  <div class="res-card" id="res-card">
-    <div class="res-icon" id="ri">💥</div>
-    <div class="res-hl"  id="rh" style="color:var(--red)">DETONATION</div>
-    <div class="res-sub" id="rs" style="color:var(--red)">TERRORISTS WIN</div>
-    <div class="res-rule" id="rr" style="background:var(--red)"></div>
-    <div class="res-body" id="rb">
-      The bomb detonated.<br>Better luck next round.
-    </div>
+  <div class="res-card" id="r-card">
+    <div class="res-ico"  id="r-ico">💥</div>
+    <div class="res-hl"   id="r-hl"  style="color:var(--red)">DETONATION</div>
+    <div class="res-sub"  id="r-sub" style="color:var(--red)">TERRORISTS WIN</div>
+    <div class="res-rule" id="r-rule" style="background:var(--red)"></div>
+    <div class="res-body" id="r-body">The bomb detonated.<br>Better luck next round.</div>
   </div>
-  <button class="btn btn-ora" onclick="playAgain()">↺  PLAY AGAIN</button>
-  <button class="btn btn-ghost" onclick="leaveRoom()">✕  MAIN MENU</button>
-  <div id="res-note" style="font-size:9px;letter-spacing:3px;color:var(--gry2);margin-top:6px;text-align:center"></div>
+  <div id="r-host" style="width:100%;display:none">
+    <button class="btn btn-ora" onclick="doPlayAgain()">↺&nbsp;&nbsp;PLAY AGAIN</button>
+  </div>
+  <div id="r-guest" class="dots" style="display:none">
+    <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    <span class="dots-lbl">WAITING FOR HOST</span>
+  </div>
+  <button class="btn btn-ghost" onclick="doLeave()">✕&nbsp;&nbsp;MAIN MENU</button>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════
-     JAVASCRIPT — ALL GAME LOGIC
-═══════════════════════════════════════════════════════════ -->
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
 <script>
 'use strict';
 
-/* ─────────────────────────────────────────────────────────────
-   § 1  FIREBASE CONFIG
-   Replace every value here with your Firebase project config.
-   Get it from: console.firebase.google.com →
-                Your project → Project settings → Your apps
-───────────────────────────────────────────────────────────── */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAol635CH2iKEmpXT0RCIEz2uIOLiPR5S0",
-  authDomain: "bomb-defusal-6ae70.firebaseapp.com",
-  databaseURL: "https://bomb-defusal-6ae70-default-rtdb.firebaseio.com",
-  projectId: "bomb-defusal-6ae70",
-  storageBucket: "bomb-defusal-6ae70.firebasestorage.app",
-  messagingSenderId: "748369863953",
-  appId: "1:748369863953:web:468fa9e72e540a74d098b0",
+/* ══════════════════════════════════════════════════════
+   § 1  FIREBASE INIT
+══════════════════════════════════════════════════════ */
+let DB = null;
+try {
+  firebase.initializeApp({
+    apiKey:            "AIzaSyAol635CH2iKEmpXT0RCIEz2uIOLiPR5S0",
+    authDomain:        "bomb-defusal-6ae70.firebaseapp.com",
+    databaseURL:       "https://bomb-defusal-6ae70-default-rtdb.firebaseio.com",
+    projectId:         "bomb-defusal-6ae70",
+    storageBucket:     "bomb-defusal-6ae70.firebasestorage.app",
+    messagingSenderId: "748369863953",
+    appId:             "1:748369863953:web:468fa9e72e540a74d098b0"
+  });
+  DB = firebase.database();
+} catch(e) {
+  console.error('Firebase init failed:', e);
+}
+
+/* ══════════════════════════════════════════════════════
+   § 2  CONSTANTS
+══════════════════════════════════════════════════════ */
+const CIRC = 534.07;          // 2 * π * 85 (SVG ring circumference)
+
+const GS = {
+  LOBBY:    'LOBBY',
+  PLANTING: 'PLANTING',
+  PLANTED:  'PLANTED',
+  DEFUSED:  'DEFUSED',
+  EXPLODED: 'EXPLODED'
 };
 
-firebase.initializeApp(FIREBASE_CONFIG);
-const DB = firebase.database();
+const T = { PLANT: 60, BOMB: 75, DEFUSE: 5, TICK: 100 };
 
-/* ─────────────────────────────────────────────────────────────
-   § 2  CONSTANTS
-───────────────────────────────────────────────────────────── */
-const MY_ID = 'P_' + Math.random().toString(36).substring(2,8).toUpperCase();
-const CIRC  = 565.49; // 2 * π * 90 (SVG ring circumference)
-const T = { PLANT:60, BOMB:75, DEFUSE:5 };
-const GS = { LOBBY:'LOBBY', PLANTING:'PLANTING', PLANTED:'PLANTED',
-             DEFUSED:'DEFUSED', EXPLODED:'EXPLODED' };
+/* ══════════════════════════════════════════════════════
+   § 3  PERSISTENT DEVICE ID
+   Survives page refresh → Planter phone keeps its role
+══════════════════════════════════════════════════════ */
+const MY_ID = (function() {
+  var K = 'bd_uid_v3';
+  var v = localStorage.getItem(K);
+  if (!v) {
+    v = 'D_' + Date.now().toString(36).toUpperCase()
+            + '_' + Math.random().toString(36).slice(2,6).toUpperCase();
+    localStorage.setItem(K, v);
+  }
+  return v;
+})();
 
-/* ─────────────────────────────────────────────────────────────
-   § 3  STATE
-───────────────────────────────────────────────────────────── */
-let roomCode=null, isHost=false, roomRef=null;
-let prevState=null;
-let plantIv=null, defIv=null, cntIv=null;
-let plantPct=0, defPct=0;
-let plantHeld=false, defHeld=false;
-let lastSync=0, wakeLock=null, aCtx=null;
+/* ══════════════════════════════════════════════════════
+   § 4  MUTABLE STATE
+══════════════════════════════════════════════════════ */
+var roomCode   = null;
+var isHost     = false;
+var myName     = '';
+var isPlanter  = false;
+var prevState  = null;
+var roomRef    = null;
 
-/* ─────────────────────────────────────────────────────────────
-   § 4  AUDIO  (Web Audio API — zero external files)
-───────────────────────────────────────────────────────────── */
-function ac(){
-  if(!aCtx) aCtx=new(window.AudioContext||window.webkitAudioContext)();
-  if(aCtx.state==='suspended') aCtx.resume();
+var ivPlant    = null;
+var ivDefuse   = null;
+var ivCdown    = null;
+
+var holdOn     = false;
+var holdPct    = 0;
+var lastSync   = 0;
+var wakeLock   = null;
+var aCtx       = null;
+var srvOffset  = 0;
+
+/* ══════════════════════════════════════════════════════
+   § 5  SERVER TIME
+══════════════════════════════════════════════════════ */
+function initSrvOffset() {
+  if (!DB) return;
+  DB.ref('.info/serverTimeOffset').on('value', function(s) {
+    srvOffset = s.val() || 0;
+  });
+}
+function srvNow() { return Date.now() + srvOffset; }
+
+/* ══════════════════════════════════════════════════════
+   § 6  AUDIO  (MP3 → Web Audio fallback)
+══════════════════════════════════════════════════════ */
+function getAC() {
+  if (!aCtx) aCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (aCtx.state === 'suspended') aCtx.resume();
   return aCtx;
 }
 
-function playPlanted(){
-  // Three sharp ascending beeps
-  try{
-    const c=ac();
-    [0,.28,.56].forEach((t,i)=>{
-      const o=c.createOscillator(), g=c.createGain();
-      o.connect(g); g.connect(c.destination);
-      o.type='square'; o.frequency.value=600+i*130;
-      const s=c.currentTime+t;
-      g.gain.setValueAtTime(.32,s);
-      g.gain.exponentialRampToValueAtTime(.001,s+.22);
-      o.start(s); o.stop(s+.24);
-    });
-  }catch(_){}
-}
-
-function playDefused(){
-  // Satisfying descending chord resolution
-  try{
-    const c=ac();
-    [1047,880,523,392].forEach((f,i)=>{
-      const o=c.createOscillator(), g=c.createGain();
-      o.connect(g); g.connect(c.destination);
-      o.type='sine'; o.frequency.value=f;
-      const s=c.currentTime+i*.17;
-      g.gain.setValueAtTime(.35,s);
-      g.gain.exponentialRampToValueAtTime(.001,s+.5);
-      o.start(s); o.stop(s+.55);
-    });
-  }catch(_){}
-}
-
-function playExplosion(){
-  // Noise burst shaped like an explosion
-  try{
-    const c=ac();
-    const dur=1.9, frames=Math.floor(c.sampleRate*dur);
-    const buf=c.createBuffer(1,frames,c.sampleRate);
-    const d=buf.getChannelData(0);
-    for(let i=0;i<frames;i++)
-      d[i]=(Math.random()*2-1)*Math.pow(1-i/frames,1.4);
-    const src=c.createBufferSource();
-    const g=c.createGain();
-    const fl=c.createBiquadFilter();
-    fl.type='lowpass'; fl.frequency.value=280;
-    src.buffer=buf;
-    src.connect(fl); fl.connect(g); g.connect(c.destination);
-    g.gain.setValueAtTime(2.8,c.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001,c.currentTime+dur);
-    src.start();
-  }catch(_){}
-}
-
-/* ─────────────────────────────────────────────────────────────
-   § 5  WAKE LOCK & VIBRATION
-───────────────────────────────────────────────────────────── */
-async function keepOn(){
-  try{ if('wakeLock'in navigator) wakeLock=await navigator.wakeLock.request('screen'); }catch(_){}
-}
-function letSleep(){ wakeLock?.release?.().catch?.(()=>{}); wakeLock=null; }
-function vib(p){ try{ navigator.vibrate?.(p); }catch(_){} }
-
-/* ─────────────────────────────────────────────────────────────
-   § 6  SCREEN ROUTER
-───────────────────────────────────────────────────────────── */
-function go(id){
-  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));
-  document.getElementById(id)?.classList.add('on');
-}
-function setLoad(txt){
-  const el=document.getElementById('load');
-  el.querySelector('.load-txt').textContent=txt||'LOADING';
-  el.classList.remove('off');
-}
-function endLoad(){ document.getElementById('load').classList.add('off'); }
-
-/* ─────────────────────────────────────────────────────────────
-   § 7  HOME SCREEN
-───────────────────────────────────────────────────────────── */
-function showMenu(){
-  document.getElementById('h-menu').style.display='';
-  document.getElementById('h-join').style.display='none';
-}
-function showJoin(){
-  document.getElementById('h-menu').style.display='none';
-  document.getElementById('h-join').style.display='';
-}
-function gname(){ return document.getElementById('h-name').value.trim().toUpperCase(); }
-
-function homeCreate(){
-  const n=gname(); if(!n) return alert('Enter your callsign first!');
-  createRoom(n);
-}
-function homeJoin(){
-  const n=gname(); if(!n) return alert('Enter your callsign!');
-  const c=document.getElementById('h-code').value.trim();
-  if(c.length!==4) return alert('Enter the 4-digit room code.');
-  joinRoom(c,n);
-}
-
-/* ─────────────────────────────────────────────────────────────
-   § 8  FIREBASE — CREATE / JOIN / START / LEAVE
-───────────────────────────────────────────────────────────── */
-async function createRoom(name){
-  setLoad('CREATING ROOM');
-  const code=(Math.floor(1000+Math.random()*9000)).toString();
-  try{
-    await DB.ref(`rooms/${code}`).set({
-      gameState:GS.LOBBY, hostId:MY_ID,
-      createdAt:Date.now(),
-      plantProgress:0, isPlanting:false, detonationTimestamp:null,
-      players:{ [MY_ID]:{ id:MY_ID, name, isHost:true } }
-    });
-    roomCode=code; isHost=true; prevState=GS.LOBBY;
-    listenRoom(); renderLobby(); endLoad(); go('s-lobby');
-  }catch(e){
-    endLoad();
-    alert(`Firebase error: ${e.message}\n\nOpen the HTML file and replace FIREBASE_CONFIG with your real project values.`);
-  }
-}
-
-async function joinRoom(code,name){
-  setLoad('JOINING ROOM');
-  try{
-    const snap=await DB.ref(`rooms/${code}`).once('value');
-    if(!snap.exists()){ endLoad(); return alert(`Room "${code}" not found.`); }
-    const d=snap.val();
-    if(d.gameState!==GS.LOBBY){ endLoad(); return alert('Game already started — wait for next round.'); }
-    await DB.ref(`rooms/${code}/players/${MY_ID}`).set({ id:MY_ID, name, isHost:false });
-    roomCode=code; isHost=false; prevState=GS.LOBBY;
-    listenRoom(); renderLobby(); endLoad(); go('s-lobby');
-  }catch(e){ endLoad(); alert(`Join failed: ${e.message}`); }
-}
-
-async function startGame(){
-  await DB.ref(`rooms/${roomCode}`).update({
-    gameState:GS.PLANTING, plantProgress:0,
-    isPlanting:false, detonationTimestamp:null
+function tryMp3(name) {
+  return new Promise(function(res, rej) {
+    var a = new Audio('sounds/' + name + '.mp3');
+    a.oncanplay = function() { a.play().then(res).catch(rej); };
+    a.onerror = rej;
   });
 }
 
-async function leaveRoom(){
-  killAll();
-  if(roomRef) roomRef.off();
-  if(roomCode){
-    try{
-      await DB.ref(`rooms/${roomCode}/players/${MY_ID}`).remove();
-      if(isHost) await DB.ref(`rooms/${roomCode}`).remove();
-    }catch(_){}
-  }
-  roomCode=null; isHost=false; roomRef=null; prevState=null;
-  document.body.style.background='';
-  showMenu(); go('s-home');
-}
-
-async function playAgain(){
-  if(isHost){
-    await DB.ref(`rooms/${roomCode}`).update({
-      gameState:GS.LOBBY, plantProgress:0,
-      isPlanting:false, detonationTimestamp:null
-    });
-  }
-  // Listener fires onStateChange → renders lobby for all devices
-}
-
-/* ─────────────────────────────────────────────────────────────
-   § 9  FIREBASE LISTENER
-───────────────────────────────────────────────────────────── */
-function listenRoom(){
-  if(roomRef) roomRef.off();
-  roomRef=DB.ref(`rooms/${roomCode}`);
-  roomRef.on('value', snap=>{
-    const d=snap.val();
-    if(!d){ alert('Room was closed.'); leaveRoom(); return; }
-    const next=d.gameState;
-
-    if(next!==prevState){
-      prevState=next;
-      onStateChange(next,d);
+function synthSound(name) {
+  try {
+    var c = getAC();
+    if (name === 'bomb_planted') {
+      [0, 0.30, 0.60].forEach(function(t, i) {
+        var o = c.createOscillator(), g = c.createGain();
+        o.connect(g); g.connect(c.destination);
+        o.type = 'square'; o.frequency.value = 580 + i * 150;
+        var s = c.currentTime + t;
+        g.gain.setValueAtTime(0.3, s);
+        g.gain.exponentialRampToValueAtTime(0.001, s + 0.25);
+        o.start(s); o.stop(s + 0.27);
+      });
+    } else if (name === 'defused') {
+      [1047, 880, 1319, 1568].forEach(function(f, i) {
+        var o = c.createOscillator(), g = c.createGain();
+        o.connect(g); g.connect(c.destination);
+        o.type = 'sine'; o.frequency.value = f;
+        var s = c.currentTime + i * 0.17;
+        g.gain.setValueAtTime(0.35, s);
+        g.gain.exponentialRampToValueAtTime(0.001, s + 0.6);
+        o.start(s); o.stop(s + 0.65);
+      });
+    } else if (name === 'explosion') {
+      var dur = 2.2, fr = c.sampleRate;
+      var buf = c.createBuffer(1, Math.floor(fr * dur), fr);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < d.length; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 1.2);
+      var src = c.createBufferSource();
+      var g   = c.createGain();
+      var fl  = c.createBiquadFilter();
+      fl.type = 'lowpass'; fl.frequency.value = 320;
+      g.gain.setValueAtTime(3.5, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+      src.buffer = buf;
+      src.connect(fl); fl.connect(g); g.connect(c.destination);
+      src.start();
     }
-
-    // Live data updates (within same state)
-    if(next===GS.LOBBY)    updatePlayers(d.players);
-    if(next===GS.PLANTING) syncPlantBar(d.plantProgress,d.isPlanting);
-  });
+  } catch(e) { console.warn('Audio synth failed:', e); }
 }
 
-function onStateChange(state,data){
-  killAll();
-  switch(state){
-    case GS.LOBBY:
-      letSleep(); renderLobby(); go('s-lobby'); break;
-
-    case GS.PLANTING:
-      keepOn(); buildPlanting(data.players); go('s-planting'); break;
-
-    case GS.PLANTED:
-      keepOn();
-      playPlanted(); vib([80,60,80,60,100]);
-      buildPlanted(data.detonationTimestamp); go('s-planted'); break;
-
-    case GS.DEFUSED:
-      letSleep(); playDefused(); vib([200,100,200]);
-      showResult(true); break;
-
-    case GS.EXPLODED:
-      letSleep(); playExplosion(); vib([500,150,500,150,1000]);
-      showResult(false); break;
-  }
+function playSound(name) {
+  tryMp3(name).catch(function() { synthSound(name); });
 }
 
-/* ─────────────────────────────────────────────────────────────
-   § 10  LOBBY
-───────────────────────────────────────────────────────────── */
-function renderLobby(){
-  document.getElementById('l-code').textContent=roomCode;
-  document.getElementById('l-host-row').style.display=isHost?'':'none';
-  document.getElementById('l-guest-row').style.display=isHost?'none':'flex';
-}
+document.addEventListener('touchstart', function() { getAC(); }, { once: true, passive: true });
+document.addEventListener('mousedown',  function() { getAC(); }, { once: true });
 
-function updatePlayers(players){
-  const list=players?Object.values(players):[];
-  const el=document.getElementById('l-players');
-  el.innerHTML=list.map(p=>`
-    <div class="p-row">
-      <div class="p-dot" style="background:${p.isHost?'var(--ora)':'var(--grn)'}"></div>
-      <span class="p-name">${p.name}</span>
-      <div style="display:flex;gap:4px">
-        ${p.isHost?`<span class="tag" style="color:var(--ora)">HOST</span>`:''}
-        ${p.id===MY_ID?`<span class="tag" style="color:var(--grn)">YOU</span>`:''}
-      </div>
-    </div>`).join('');
-  document.getElementById('l-cnt').textContent=list.length;
-  document.getElementById('l-need-more').style.display=list.length>=2?'none':'';
-  const sb=document.getElementById('l-start');
-  if(list.length>=2){ sb.classList.remove('dis'); sb.disabled=false; }
-  else{ sb.classList.add('dis'); sb.disabled=true; }
-}
-
-/* ─────────────────────────────────────────────────────────────
-   § 11  PLANTING
-───────────────────────────────────────────────────────────── */
-function buildPlanting(players){
-  // Reset UI
-  setRing('pr',0,'var(--ora)');
-  setBar('pb-fill','var(--ora)',0);
-  setText('pb-lbl','HOLD TO ARM  ·  RELEASE = ABORT');
-  setText('plant-lbl','HOLD 60S\nTO PLANT');
-  el('plant-in').className='ring-in';
-  el('plant-btn').classList.add('pulse-btn');
-  plantPct=0; plantHeld=false;
-
-  // Roster display
-  const list=players?Object.values(players):[];
-  setText('plant-roster', list.map(p=>'▸ '+p.name).join('  '));
-
-  // Attach hold listeners
-  hookHold('plant-btn', startPlant, stopPlant);
-}
-
-function syncPlantBar(pct,holding){
-  if(plantHeld) return; // don't overwrite own progress
-  pct=pct||0;
-  setRing('pr', pct/100, pct>70?'var(--red)':'var(--ora)');
-  setBar('pb-fill','var(--ora)',pct);
-  setText('pb-lbl', holding
-    ? `TEAMMATE ARMING…  ${Math.floor(pct)}%`
-    : 'HOLD TO ARM  ·  RELEASE = ABORT');
-}
-
-function startPlant(){
-  if(plantHeld) return;
-  plantHeld=true;
-  el('plant-btn').classList.remove('pulse-btn');
-  el('plant-in').className='ring-in hold-ora';
-  vib([60,80]);
-
-  const inc=100/(T.PLANT*10);
-  plantIv=setInterval(()=>{
-    plantPct=Math.min(100,plantPct+inc);
-    const col=plantPct>70?'var(--red)':'var(--ora)';
-    setRing('pr',plantPct/100,col);
-    setBar('pb-fill',col,plantPct);
-    setText('pb-lbl',`ARMING…  ${Math.floor(plantPct)}%`);
-    setText('plant-lbl',`${Math.floor((plantPct/100)*T.PLANT)}s\nARMED`);
-
-    // Throttled Firebase sync (every 500ms)
-    const now=Date.now();
-    if(now-lastSync>500){
-      lastSync=now;
-      DB.ref(`rooms/${roomCode}`).update({ plantProgress:plantPct, isPlanting:true }).catch(()=>{});
+/* ══════════════════════════════════════════════════════
+   § 7  WAKE LOCK
+══════════════════════════════════════════════════════ */
+function keepOn() {
+  try {
+    if ('wakeLock' in navigator && !wakeLock) {
+      navigator.wakeLock.request('screen').then(function(wl) { wakeLock = wl; }).catch(function(){});
     }
-    if(plantPct>=100){ clearInterval(plantIv); doPlant(); }
-  },100);
+  } catch(e) {}
 }
-
-function stopPlant(){
-  if(!plantHeld) return;
-  plantHeld=false;
-  clearInterval(plantIv);
-  vib(0);
-  plantPct=0;
-  buildPlanting(null); // resets UI
-  DB.ref(`rooms/${roomCode}`).update({ plantProgress:0, isPlanting:false }).catch(()=>{});
+function letSleep() {
+  if (wakeLock) { wakeLock.release().catch(function(){}); wakeLock = null; }
 }
-
-async function doPlant(){
-  plantHeld=false;
-  vib([100,50,100,50,200]);
-  const det=Date.now()+T.BOMB*1000;
-  await DB.ref(`rooms/${roomCode}`).update({
-    gameState:GS.PLANTED, detonationTimestamp:det,
-    plantProgress:100, isPlanting:false
-  }).catch(console.error);
-}
-
-/* ─────────────────────────────────────────────────────────────
-   § 12  PLANTED / COUNTDOWN
-───────────────────────────────────────────────────────────── */
-function buildPlanted(det){
-  // Reset defuse UI
-  setRing('dr',0,'var(--grn)');
-  setBar('db-fill','var(--grn)',0);
-  setText('db-lbl','HOLD 5S TO DEFUSE  ·  RELEASE = ABORT');
-  setText('def-lbl','HOLD TO\nDEFUSE');
-  el('def-in').className='ring-in';
-  el('crit').style.display='none';
-  defPct=0; defHeld=false;
-
-  startCountdown(det);
-  hookHold('def-btn', startDefuse, stopDefuse);
-}
-
-function startCountdown(det){
-  const cnt=el('countdown'), crit=el('crit');
-  const tick=()=>{
-    const rem=(det-Date.now())/1000;
-    const s=Math.max(0,rem);
-    const mm=Math.floor(s/60).toString().padStart(2,'0');
-    const ss=Math.floor(s%60).toString().padStart(2,'0');
-    cnt.textContent=`${mm}:${ss}`;
-
-    if(s<=10){ cnt.style.color='var(--red)'; cnt.style.textShadow='0 0 40px var(--red)'; }
-    else if(s<=20){ cnt.style.color='var(--yel)'; cnt.style.textShadow='0 0 30px var(--yel)'; }
-    else{ cnt.style.color='var(--ora)'; cnt.style.textShadow='0 0 30px rgba(255,106,0,.55)'; }
-
-    crit.style.display=(s<=15&&s>0)?'':'none';
-    if(s<=10&&Math.round(s*2)%2===0) vib([35]);
-
-    if(s<=0){
-      clearInterval(cntIv);
-      DB.ref(`rooms/${roomCode}`).update({ gameState:GS.EXPLODED }).catch(()=>{});
-    }
-  };
-  tick();
-  cntIv=setInterval(tick,200);
-}
-
-function startDefuse(){
-  if(defHeld) return;
-  defHeld=true;
-  el('def-in').className='ring-in hold-grn';
-  vib([50,70]);
-
-  const inc=100/(T.DEFUSE*10);
-  defIv=setInterval(()=>{
-    defPct=Math.min(100,defPct+inc);
-    setRing('dr',defPct/100,'var(--grn)');
-    setBar('db-fill','var(--grn)',defPct);
-    setText('db-lbl',`DEFUSING…  ${Math.floor(defPct)}%`);
-    setText('def-lbl',`${Math.floor(defPct)}%\nDEFUSING`);
-    if(defPct>=100){ clearInterval(defIv); doDefuse(); }
-  },100);
-}
-
-function stopDefuse(){
-  if(!defHeld) return;
-  defHeld=false;
-  clearInterval(defIv);
-  vib(0);
-  defPct=0;
-  setRing('dr',0,'var(--grn)');
-  setBar('db-fill','var(--grn)',0);
-  setText('db-lbl','HOLD 5S TO DEFUSE  ·  RELEASE = ABORT');
-  setText('def-lbl','HOLD TO\nDEFUSE');
-  el('def-in').className='ring-in';
-  hookHold('def-btn', startDefuse, stopDefuse);
-}
-
-async function doDefuse(){
-  defHeld=false;
-  clearInterval(cntIv);
-  vib([200,100,200]);
-  await DB.ref(`rooms/${roomCode}`).update({ gameState:GS.DEFUSED }).catch(console.error);
-}
-
-/* ─────────────────────────────────────────────────────────────
-   § 13  RESULT
-───────────────────────────────────────────────────────────── */
-function showResult(win){
-  killAll();
-  const acc=win?'var(--grn)':'var(--red)';
-  document.body.style.background=win?'#011008':'#100000';
-  el('res-card').style.border=`2px solid ${acc}`;
-  el('ri').textContent=win?'🛡':'💥';
-  el('rh').textContent=win?'BOMB DEFUSED':'DETONATION';
-  el('rh').style.color=acc;
-  el('rs').textContent=win?'COUNTER-TERRORISTS WIN':'TERRORISTS WIN';
-  el('rs').style.color=acc;
-  el('rr').style.background=acc;
-  el('rb').innerHTML=win
-    ?'Device neutralized.<br>Outstanding work, operator.'
-    :'The bomb detonated.<br>Better luck next round.';
-  el('res-note').textContent=isHost?'':'Host controls the next round.';
-  go('s-result');
-}
-
-/* ─────────────────────────────────────────────────────────────
-   § 14  HOLD-BUTTON HELPER
-   Clones the element to remove all previous listeners,
-   then attaches fresh mouse + touch handlers.
-───────────────────────────────────────────────────────────── */
-function hookHold(id, onDown, onUp){
-  const old=document.getElementById(id);
-  const fresh=old.cloneNode(true);
-  old.parentNode.replaceChild(fresh,old);
-
-  fresh.addEventListener('mousedown',  onDown);
-  fresh.addEventListener('mouseup',    onUp);
-  fresh.addEventListener('mouseleave', onUp);
-  fresh.addEventListener('touchstart', e=>{ e.preventDefault(); onDown(); }, {passive:false});
-  fresh.addEventListener('touchend',   e=>{ e.preventDefault(); onUp();   }, {passive:false});
-  fresh.addEventListener('touchcancel',onUp);
-}
-
-/* ─────────────────────────────────────────────────────────────
-   § 15  TINY HELPERS
-───────────────────────────────────────────────────────────── */
-const el  = id => document.getElementById(id);
-const setText = (id,t) => { const e=el(id); if(e) e.innerHTML=t.replace('\n','<br>'); };
-const setBar  = (id,col,pct) => {
-  const e=el(id);
-  if(!e) return;
-  e.style.background=col;
-  e.style.width=pct+'%';
-};
-const setRing = (id,pct,col) => {
-  const e=el(id);
-  if(!e) return;
-  e.style.strokeDashoffset=CIRC*(1-pct);
-  if(col) e.style.stroke=col;
-};
-
-function killAll(){
-  clearInterval(plantIv);
-  clearInterval(defIv);
-  clearInterval(cntIv);
-  plantIv=defIv=cntIv=null;
-  plantHeld=defHeld=false;
-  plantPct=defPct=0;
-}
-
-/* ─────────────────────────────────────────────────────────────
-   § 16  INIT
-───────────────────────────────────────────────────────────── */
-
-// Unlock AudioContext on first user touch
-document.addEventListener('touchstart', ()=>ac(), {once:true,passive:true});
-document.addEventListener('mousedown',  ()=>ac(), {once:true});
-
-// Re-acquire wake lock when returning to page
-document.addEventListener('visibilitychange', async()=>{
-  if(document.visibilityState==='visible'&&!wakeLock){
-    if(prevState===GS.PLANTING||prevState===GS.PLANTED) await keepOn();
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && !wakeLock) {
+    if (prevState === GS.PLANTING || prevState === GS.PLANTED) keepOn();
   }
 });
 
-// Prevent accidental double-tap zoom on iOS buttons
-document.addEventListener('dblclick', e=>e.preventDefault());
+/* ══════════════════════════════════════════════════════
+   § 8  VIBRATION
+══════════════════════════════════════════════════════ */
+function vib(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch(e) {} }
 
-// Boot
-setTimeout(()=>{ endLoad(); go('s-home'); }, 700);
+/* ══════════════════════════════════════════════════════
+   § 9  SCREEN ROUTER
+══════════════════════════════════════════════════════ */
+function go(id) {
+  var screens = document.querySelectorAll('.scr');
+  for (var i = 0; i < screens.length; i++) screens[i].classList.remove('on');
+  var t = document.getElementById(id);
+  if (t) { t.classList.add('on'); t.scrollTop = 0; }
+}
+
+/* ══════════════════════════════════════════════════════
+   § 10  LOADER + TOAST
+══════════════════════════════════════════════════════ */
+var safetyTimer = null;
+
+function showLoader(msg) {
+  clearTimeout(safetyTimer);
+  document.getElementById('ld-msg').textContent = msg || 'LOADING';
+  var l = document.getElementById('loader');
+  l.classList.remove('hide');
+  l.style.display = 'flex';
+}
+
+function hideLoader() {
+  var l = document.getElementById('loader');
+  l.classList.add('hide');
+  setTimeout(function() { l.style.display = 'none'; }, 400);
+}
+
+var toastTimer = null;
+function toast(msg, dur) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.classList.remove('on'); }, dur || 2800);
+}
+
+/* ══════════════════════════════════════════════════════
+   § 11  HOME
+══════════════════════════════════════════════════════ */
+function uiShowMenu() {
+  document.getElementById('v-menu').style.display = '';
+  document.getElementById('v-join').style.display = 'none';
+}
+function uiShowJoin() {
+  document.getElementById('v-menu').style.display = 'none';
+  document.getElementById('v-join').style.display = '';
+}
+function getName() {
+  return document.getElementById('n-name').value.trim().toUpperCase();
+}
+function uiCreate() {
+  var n = getName();
+  if (!n) { toast('ENTER YOUR CALLSIGN FIRST'); return; }
+  doCreate(n);
+}
+function uiJoin() {
+  var n = getName();
+  if (!n) { toast('ENTER YOUR CALLSIGN'); return; }
+  var c = document.getElementById('n-code').value.trim();
+  if (c.length !== 4 || isNaN(c)) { toast('ENTER A VALID 4-DIGIT CODE'); return; }
+  doJoin(c, n);
+}
+
+/* ══════════════════════════════════════════════════════
+   § 12  FIREBASE: CREATE ROOM
+══════════════════════════════════════════════════════ */
+function doCreate(name) {
+  if (!DB) { toast('FIREBASE NOT CONNECTED'); return; }
+  showLoader('CREATING ROOM...');
+  var code = String(Math.floor(1000 + Math.random() * 9000));
+
+  DB.ref('rooms/' + code).set({
+    gameState:           GS.LOBBY,
+    hostId:              MY_ID,
+    planterId:           null,
+    detonationTimestamp: null,
+    plantProgress:       0,
+    isPlanting:          false,
+    createdAt:           firebase.database.ServerValue.TIMESTAMP,
+    players: {
+      [MY_ID]: { id: MY_ID, name: name, isHost: true }
+    }
+  }).then(function() {
+    localStorage.setItem('bd_room', code);
+    localStorage.setItem('bd_name', name);
+    roomCode = code; isHost = true; myName = name; prevState = GS.LOBBY;
+    listenRoom();
+    renderLobbyShell();
+    hideLoader();
+    go('s-lobby');
+  }).catch(function(e) {
+    hideLoader();
+    toast('ERROR: ' + e.message);
+    console.error(e);
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   § 13  FIREBASE: JOIN ROOM
+══════════════════════════════════════════════════════ */
+function doJoin(code, name) {
+  if (!DB) { toast('FIREBASE NOT CONNECTED'); return; }
+  showLoader('JOINING ROOM...');
+
+  DB.ref('rooms/' + code).once('value').then(function(snap) {
+    if (!snap.exists()) {
+      hideLoader(); toast('ROOM NOT FOUND'); return;
+    }
+    var d = snap.val();
+    if (d.gameState !== GS.LOBBY) {
+      hideLoader(); toast('GAME ALREADY STARTED'); return;
+    }
+    var cnt = Object.keys(d.players || {}).length;
+    if (cnt >= 8) {
+      hideLoader(); toast('ROOM IS FULL'); return;
+    }
+    // Add or update player
+    var playerData = { id: MY_ID, name: name, isHost: false };
+    return DB.ref('rooms/' + code + '/players/' + MY_ID).set(playerData)
+      .then(function() {
+        localStorage.setItem('bd_room', code);
+        localStorage.setItem('bd_name', name);
+        roomCode = code; isHost = false; myName = name; prevState = GS.LOBBY;
+        listenRoom();
+        renderLobbyShell();
+        hideLoader();
+        go('s-lobby');
+      });
+  }).catch(function(e) {
+    hideLoader(); toast('JOIN ERROR: ' + e.message); console.error(e);
+  });
+}
+
+/* ══════════════════════════════════════════════════════
+   § 14  FIREBASE: START / RESET / LEAVE
+══════════════════════════════════════════════════════ */
+function doStartGame() {
+  if (!DB || !roomCode) return;
+  DB.ref('rooms/' + roomCode + '/players').once('value').then(function(snap) {
+    var ids = Object.keys(snap.val() || {});
+    if (ids.length < 2) { toast('NEED AT LEAST 2 PLAYERS'); return; }
+    var planterId = ids[Math.floor(Math.random() * ids.length)];
+    return DB.ref('rooms/' + roomCode).update({
+      gameState:           GS.PLANTING,
+      planterId:           planterId,
+      plantProgress:       0,
+      isPlanting:          false,
+      detonationTimestamp: null
+    });
+  }).catch(function(e) { console.error(e); });
+}
+
+function doReset() {
+  if (!confirm('Reset game? All players return to lobby.')) return;
+  killTimers();
+  if (DB && roomCode) {
+    DB.ref('rooms/' + roomCode).update({
+      gameState:           GS.LOBBY,
+      planterId:           null,
+      plantProgress:       0,
+      isPlanting:          false,
+      detonationTimestamp: null
+    }).catch(function(e) { console.error(e); });
+  }
+}
+
+function doPlayAgain() { doReset(); }
+
+function doLeave() {
+  killTimers(); letSleep();
+  if (roomRef) { roomRef.off(); roomRef = null; }
+  if (DB && roomCode) {
+    DB.ref('rooms/' + roomCode + '/players/' + MY_ID).remove().then(function() {
+      if (isHost) return DB.ref('rooms/' + roomCode).remove();
+    }).catch(function(){});
+  }
+  localStorage.removeItem('bd_room');
+  localStorage.removeItem('bd_name');
+  roomCode = null; isHost = false; myName = ''; prevState = null; isPlanter = false;
+  document.body.style.background = '';
+  uiShowMenu();
+  go('s-home');
+}
+
+/* ══════════════════════════════════════════════════════
+   § 15  ROOM LISTENER & STATE MACHINE
+══════════════════════════════════════════════════════ */
+function listenRoom() {
+  if (!DB) return;
+  if (roomRef) roomRef.off();
+  roomRef = DB.ref('rooms/' + roomCode);
+
+  roomRef.on('value', function(snap) {
+    var d = snap.val();
+    if (!d) { toast('ROOM CLOSED'); doLeave(); return; }
+
+    isPlanter = (d.planterId === MY_ID);
+
+    // Live updates within same state
+    if (d.gameState === GS.LOBBY)    renderPlayers(d.players);
+    if (d.gameState === GS.PLANTING && !holdOn) mirrorPlant(d.plantProgress, d.isPlanting);
+
+    // State transition
+    if (d.gameState !== prevState) {
+      prevState = d.gameState;
+      onStateChange(d);
+    }
+  });
+}
+
+function onStateChange(d) {
+  killTimers();
+  holdOn = false; holdPct = 0;
+
+  if (d.gameState === GS.LOBBY) {
+    letSleep();
+    document.body.style.background = '';
+    renderLobbyShell();
+    renderPlayers(d.players);
+    go('s-lobby');
+
+  } else if (d.gameState === GS.PLANTING) {
+    keepOn();
+    buildPlanting();
+    go('s-game');
+
+  } else if (d.gameState === GS.PLANTED) {
+    keepOn();
+    playSound('bomb_planted');
+    vib([80, 60, 80, 60, 120]);
+    buildPlanted(d.detonationTimestamp);
+    go('s-game');
+
+  } else if (d.gameState === GS.DEFUSED) {
+    letSleep();
+    playSound('defused');
+    vib([200, 100, 200, 100, 300]);
+    showResult(true);
+
+  } else if (d.gameState === GS.EXPLODED) {
+    letSleep();
+    playSound('explosion');
+    vib([500, 150, 600, 150, 900]);
+    showResult(false);
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   § 16  LOBBY UI
+══════════════════════════════════════════════════════ */
+function renderLobbyShell() {
+  document.getElementById('l-code').textContent = roomCode;
+  document.getElementById('l-host-row').style.display  = isHost ? '' : 'none';
+  document.getElementById('l-guest-row').style.display = isHost ? 'none' : 'flex';
+}
+
+function renderPlayers(obj) {
+  var list = obj ? Object.values(obj) : [];
+  list.sort(function(a, b) {
+    if (a.isHost && !b.isHost) return -1;
+    if (!a.isHost && b.isHost) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  document.getElementById('l-cnt').textContent   = list.length;
+  document.getElementById('l-empty').style.display = list.length < 2 ? '' : 'none';
+
+  document.getElementById('l-players').innerHTML = list.map(function(p) {
+    return '<div class="prow">' +
+      '<div class="pdot" style="background:' + (p.isHost ? 'var(--ora)' : 'var(--grn)') + '"></div>' +
+      '<span class="pname">' + esc(p.name || '?') + '</span>' +
+      '<div class="ptags">' +
+        (p.isHost ? '<span class="ptag" style="color:var(--ora)">HOST</span>' : '') +
+        (p.id === MY_ID ? '<span class="ptag" style="color:var(--grn)">YOU</span>' : '') +
+      '</div></div>';
+  }).join('');
+
+  var sb = document.getElementById('btn-start');
+  if (sb) {
+    if (list.length >= 2) { sb.classList.remove('btn-off'); sb.removeAttribute('disabled'); }
+    else                   { sb.classList.add('btn-off');    sb.setAttribute('disabled', ''); }
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   § 17  PLANTING PHASE
+══════════════════════════════════════════════════════ */
+function buildPlanting() {
+  if (isPlanter) {
+    setRoleBanner('planter', 'ARMED DEVICE', 'PLANTER');
+  } else {
+    setRoleBanner('seeker', 'COUNTER-TERRORIST', 'SEEKER');
+  }
+  document.getElementById('g-host-strip').style.display = isHost ? '' : 'none';
+  document.getElementById('g-cdown').style.display = 'none';
+
+  if (isPlanter) {
+    setStatus('ARM THE DEVICE.\nHold the button for 60 seconds,\nthen hide this phone.');
+    showEl('g-prog'); setBar('var(--ora)', 0);
+    html('g-prog-lbl', 'HOLD TO ARM &middot; RELEASE = ABORT');
+    setupRing('var(--ora)', '💣', 'HOLD 60S<br>TO PLANT');
+    showEl('g-ring', 'flex'); hideEl('g-seeker');
+    html('g-foot', 'Hold ' + T.PLANT + 's to arm &middot; Then hide this phone');
+    hookHold('ring-btn', startPlant, stopPlant);
+  } else {
+    setStatus('BOMB IS BEING ARMED.\nStand by for deployment.');
+    hideEl('g-prog'); hideEl('g-ring');
+    showEl('g-seeker', 'flex');
+    html('g-seeker-ico', '⏳');
+    html('g-seeker-lbl', 'BOMBER IS ARMING THE DEVICE');
+    html('g-foot', 'Stay alert — bomb deployment is imminent');
+  }
+}
+
+function mirrorPlant(pct, holding) {
+  if (isPlanter) return;
+  pct = pct || 0;
+  html('g-seeker-lbl', holding
+    ? ('ARMING IN PROGRESS… ' + Math.floor(pct) + '%')
+    : 'BOMBER IS ARMING THE DEVICE');
+}
+
+/* Plant hold */
+function startPlant() {
+  if (holdOn) return;
+  holdOn = true; holdPct = 0;
+  document.getElementById('ring-btn').classList.remove('ring-idle');
+  document.getElementById('ring-face').className = 'ring-face act-o';
+  document.getElementById('ring-pct').style.display = '';
+  document.getElementById('ring-lbl').style.display = 'none';
+  vib([60, 80]);
+
+  var inc = 100 / (T.PLANT * (1000 / T.TICK));
+  ivPlant = setInterval(function() {
+    holdPct = Math.min(100, holdPct + inc);
+    var col = holdPct > 70 ? 'var(--red)' : 'var(--ora)';
+    setArc(holdPct / 100, col);
+    setBar(col, holdPct);
+    html('ring-pct', Math.floor(holdPct) + '%');
+    html('g-prog-lbl', 'ARMING… ' + Math.floor(holdPct) + '%');
+
+    // Throttle Firebase write to every 500ms
+    var n = Date.now();
+    if (n - lastSync > 500) {
+      lastSync = n;
+      if (DB) {
+        DB.ref('rooms/' + roomCode).update({
+          plantProgress: holdPct, isPlanting: true
+        }).catch(function(){});
+      }
+    }
+    if (holdPct >= 100) {
+      clearInterval(ivPlant); ivPlant = null;
+      finishPlant();
+    }
+  }, T.TICK);
+}
+
+function stopPlant() {
+  if (!holdOn) return;
+  holdOn = false;
+  clearInterval(ivPlant); ivPlant = null;
+  vib(0); holdPct = 0;
+  if (DB) {
+    DB.ref('rooms/' + roomCode).update({ plantProgress: 0, isPlanting: false }).catch(function(){});
+  }
+  buildPlanting();
+  hookHold('ring-btn', startPlant, stopPlant);
+}
+
+function finishPlant() {
+  holdOn = false;
+  vib([120, 60, 120, 60, 250]);
+  var det = srvNow() + T.BOMB * 1000;
+  if (DB) {
+    DB.ref('rooms/' + roomCode).update({
+      gameState:           GS.PLANTED,
+      detonationTimestamp: det,
+      plantProgress:       100,
+      isPlanting:          false
+    }).catch(function(e) { console.error(e); });
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   § 18  PLANTED PHASE
+══════════════════════════════════════════════════════ */
+function buildPlanted(det) {
+  if (isPlanter) {
+    setRoleBanner('planter', 'ARMED DEVICE', 'PLANTER');
+  } else {
+    setRoleBanner('seeker', 'COUNTER-TERRORIST', 'SEEKER');
+  }
+  document.getElementById('g-host-strip').style.display = isHost ? '' : 'none';
+  showEl('g-cdown', 'block');
+  document.getElementById('g-cdown-crit').style.display = 'none';
+  runCdown(det);
+
+  if (isPlanter) {
+    setStatus('BOMB IS LIVE.\nThis phone IS the bomb.\nHold DEFUSE if seekers find you.');
+    showEl('g-prog'); setBar('var(--grn)', 0);
+    html('g-prog-lbl', 'HOLD 5S TO DEFUSE &middot; RELEASE = ABORT');
+    setupRing('var(--grn)', '🔧', 'HOLD TO<br>DEFUSE');
+    showEl('g-ring', 'flex'); hideEl('g-seeker');
+    html('g-foot', 'Seekers have ' + T.BOMB + 's to find &amp; defuse you');
+    hookHold('ring-btn', startDefuse, stopDefuse);
+  } else {
+    setStatus('BOMB HAS BEEN PLANTED!\nFind the hidden phone!\nHold DEFUSE for 5 seconds!');
+    hideEl('g-prog'); hideEl('g-ring');
+    showEl('g-seeker', 'flex');
+    html('g-seeker-ico', '🔴');
+    html('g-seeker-lbl', 'FIND THE BOMB DEVICE — GO!');
+    html('g-foot', "Find the Planter's hidden phone and hold DEFUSE");
+  }
+}
+
+function runCdown(det) {
+  var valEl  = document.getElementById('g-cdown-val');
+  var critEl = document.getElementById('g-cdown-crit');
+
+  function tick() {
+    var rem = (det - srvNow()) / 1000;
+    var s   = Math.max(0, rem);
+    var mm  = String(Math.floor(s / 60)).padStart(2, '0');
+    var ss  = String(Math.floor(s % 60)).padStart(2, '0');
+    valEl.textContent = mm + ':' + ss;
+
+    if (s <= 10) {
+      valEl.style.color       = 'var(--red)';
+      valEl.style.textShadow  = '0 0 40px var(--red)';
+      if (Math.round(rem * 2) % 2 === 0) vib([40]);
+    } else if (s <= 20) {
+      valEl.style.color       = 'var(--yel)';
+      valEl.style.textShadow  = '0 0 30px var(--yel)';
+    } else {
+      valEl.style.color       = 'var(--ora)';
+      valEl.style.textShadow  = '0 0 28px rgba(255,102,0,.5)';
+    }
+
+    critEl.style.display = (s > 0 && s <= 15) ? '' : 'none';
+
+    if (s <= 0) {
+      clearInterval(ivCdown); ivCdown = null;
+      // Guard against race: only write EXPLODED if still PLANTED
+      if (DB) {
+        DB.ref('rooms/' + roomCode + '/gameState').once('value').then(function(snap) {
+          if (snap.val() === GS.PLANTED) {
+            DB.ref('rooms/' + roomCode).update({ gameState: GS.EXPLODED });
+          }
+        });
+      }
+    }
+  }
+
+  tick();
+  ivCdown = setInterval(tick, 200);
+}
+
+/* Defuse hold */
+function startDefuse() {
+  if (holdOn) return;
+  holdOn = true; holdPct = 0;
+  document.getElementById('ring-btn').classList.remove('ring-idle');
+  document.getElementById('ring-face').className = 'ring-face act-g';
+  document.getElementById('ring-pct').style.display = '';
+  document.getElementById('ring-lbl').style.display = 'none';
+  vib([50, 70]);
+
+  var inc = 100 / (T.DEFUSE * (1000 / T.TICK));
+  ivDefuse = setInterval(function() {
+    holdPct = Math.min(100, holdPct + inc);
+    setArc(holdPct / 100, 'var(--grn)');
+    setBar('var(--grn)', holdPct);
+    html('ring-pct', Math.floor(holdPct) + '%');
+    html('g-prog-lbl', 'DEFUSING… ' + Math.floor(holdPct) + '%');
+    if (holdPct >= 100) {
+      clearInterval(ivDefuse); ivDefuse = null;
+      finishDefuse();
+    }
+  }, T.TICK);
+}
+
+function stopDefuse() {
+  if (!holdOn) return;
+  holdOn = false;
+  clearInterval(ivDefuse); ivDefuse = null;
+  vib(0); holdPct = 0;
+  setArc(0, 'var(--grn)'); setBar('var(--grn)', 0);
+  document.getElementById('ring-face').className = 'ring-face';
+  document.getElementById('ring-pct').style.display = 'none';
+  document.getElementById('ring-lbl').style.display = '';
+  html('g-prog-lbl', 'HOLD 5S TO DEFUSE &middot; RELEASE = ABORT');
+  hookHold('ring-btn', startDefuse, stopDefuse);
+}
+
+function finishDefuse() {
+  holdOn = false;
+  clearInterval(ivCdown);
+  vib([200, 100, 200, 100, 400]);
+  if (DB) {
+    DB.ref('rooms/' + roomCode).update({ gameState: GS.DEFUSED }).catch(function(e) { console.error(e); });
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   § 19  RESULT SCREEN
+══════════════════════════════════════════════════════ */
+function showResult(win) {
+  killTimers();
+  var ac = win ? 'var(--grn)' : 'var(--red)';
+  document.body.style.background = win ? '#001508' : '#0d0000';
+  document.getElementById('r-card').style.borderColor = ac;
+  html('r-ico',  win ? '🛡'                         : '💥');
+  html('r-hl',   win ? 'BOMB DEFUSED'               : 'DETONATION');
+  html('r-sub',  win ? 'COUNTER&#8209;TERRORISTS WIN' : 'TERRORISTS WIN');
+  html('r-body', win ? 'Device neutralized.<br>Outstanding work, operator.'
+                     : 'The bomb detonated.<br>Better luck next round.');
+  document.getElementById('r-hl').style.color      = ac;
+  document.getElementById('r-sub').style.color     = ac;
+  document.getElementById('r-rule').style.background = ac;
+  document.getElementById('r-host').style.display  = isHost ? '' : 'none';
+  document.getElementById('r-guest').style.display = isHost ? 'none' : 'flex';
+  go('s-result');
+}
+
+/* ══════════════════════════════════════════════════════
+   § 20  HOLD-BUTTON MOUNT
+   Clone element to wipe stale listeners, then re-attach.
+══════════════════════════════════════════════════════ */
+function hookHold(id, onDown, onUp) {
+  var old = document.getElementById(id);
+  if (!old) return;
+  var fresh = old.cloneNode(true);
+  old.parentNode.replaceChild(fresh, old);
+
+  fresh.addEventListener('mousedown',   function(e){ e.preventDefault(); onDown(); });
+  fresh.addEventListener('mouseup',     function(e){ e.preventDefault(); onUp(); });
+  fresh.addEventListener('mouseleave',  function(){ onUp(); });
+  fresh.addEventListener('touchstart',  function(e){ e.preventDefault(); onDown(); }, { passive: false });
+  fresh.addEventListener('touchend',    function(e){ e.preventDefault(); onUp(); },   { passive: false });
+  fresh.addEventListener('touchcancel', function(){ onUp(); });
+  fresh.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+}
+
+/* ══════════════════════════════════════════════════════
+   § 21  DOM HELPERS
+══════════════════════════════════════════════════════ */
+function el(id)      { return document.getElementById(id); }
+function html(id, h) { var e = el(id); if (e) e.innerHTML = h; }
+function esc(s)      { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showEl(id, d) { var e = el(id); if (e) e.style.display = d || 'block'; }
+function hideEl(id)    { var e = el(id); if (e) e.style.display = 'none'; }
+
+function setStatus(msg) {
+  html('g-status', msg.replace(/\n/g, '<br>'));
+}
+
+function setRoleBanner(type, desc, name) {
+  el('g-role').className = 'role-bar ' + type;
+  html('g-role-desc', desc);
+  html('g-role-name', name);
+}
+
+function setupRing(color, icon, lbl) {
+  var arc = el('ring-arc');
+  if (arc) { arc.style.stroke = color; arc.style.strokeDashoffset = CIRC; }
+  el('ring-face').className = 'ring-face';
+  html('ring-icon', icon);
+  html('ring-lbl',  lbl);
+  el('ring-pct').style.display = 'none';
+  el('ring-lbl').style.display = '';
+  el('ring-btn').classList.add('ring-idle');
+}
+
+function setArc(pct, color) {
+  var a = el('ring-arc');
+  if (!a) return;
+  a.style.strokeDashoffset = CIRC * (1 - pct);
+  if (color) a.style.stroke = color;
+}
+
+function setBar(color, pct) {
+  var f = el('g-prog-fill');
+  if (!f) return;
+  f.style.background = color;
+  f.style.width = pct + '%';
+}
+
+function killTimers() {
+  clearInterval(ivPlant);
+  clearInterval(ivDefuse);
+  clearInterval(ivCdown);
+  ivPlant = ivDefuse = ivCdown = null;
+  holdOn = false; holdPct = 0;
+}
+
+/* ══════════════════════════════════════════════════════
+   § 22  AUTO-REJOIN ON PAGE REFRESH
+   MY_ID is stable → Planter phone re-identifies itself
+══════════════════════════════════════════════════════ */
+function tryRejoin() {
+  var r = localStorage.getItem('bd_room');
+  var n = localStorage.getItem('bd_name');
+  if (!r || !n || !DB) return Promise.resolve(false);
+
+  return DB.ref('rooms/' + r).once('value').then(function(rs) {
+    if (!rs.exists()) {
+      localStorage.removeItem('bd_room');
+      localStorage.removeItem('bd_name');
+      return false;
+    }
+    return DB.ref('rooms/' + r + '/players/' + MY_ID).once('value').then(function(ps) {
+      if (!ps.exists()) return false;
+      var d = rs.val();
+      roomCode  = r;
+      myName    = n;
+      isHost    = (d.hostId   === MY_ID);
+      isPlanter = (d.planterId === MY_ID);
+      prevState = null;
+      el('n-name').value = n;
+      listenRoom();
+      return true;
+    });
+  }).catch(function() { return false; });
+}
+
+/* ══════════════════════════════════════════════════════
+   § 23  APP BOOT
+══════════════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', function() {
+  // Prevent double-tap zoom
+  document.addEventListener('dblclick', function(e) { e.preventDefault(); });
+
+  showLoader('CONNECTING...');
+  initSrvOffset();
+
+  // Safety net: always show home screen after 5s max
+  safetyTimer = setTimeout(function() {
+    hideLoader();
+    go('s-home');
+  }, 5000);
+
+  tryRejoin().then(function(rejoined) {
+    clearTimeout(safetyTimer);
+    if (rejoined) {
+      // Firebase listener will fire → route to correct screen
+      setTimeout(function() { hideLoader(); }, 700);
+    } else {
+      hideLoader();
+      go('s-home');
+    }
+  }).catch(function() {
+    clearTimeout(safetyTimer);
+    hideLoader();
+    go('s-home');
+  });
+});
 </script>
 </body>
 </html>
